@@ -662,6 +662,10 @@
             color: var(--primary);
         }
 
+        .kpi-value.kpi-value-small {
+            font-size: 1.1rem;
+        }
+
         .kpi-label {
             font-size: 0.8rem;
             color: #64748b;
@@ -994,7 +998,8 @@
             .btn,
             #alertContainer,
             .loading,
-            .footer {
+            .footer,
+            .intro-cards {
                 display: none !important;
             }
 
@@ -1496,20 +1501,18 @@
                             <div class="kpi-label">Total de Amostras</div>
                         </div>
                         <div class="kpi-card" id="kpiPressaoMax">
-                            <span class="kpi-badge ok" id="kpiPressaoBadge">OK</span>
                             <div class="kpi-icon">⚡</div>
                             <div class="kpi-value" id="kpiPressaoValue">--</div>
                             <div class="kpi-label">Pressão Máxima (bar)</div>
                         </div>
                         <div class="kpi-card" id="kpiVazaoMedia">
-                            <span class="kpi-badge ok" id="kpiVazaoBadge">OK</span>
                             <div class="kpi-icon">💧</div>
                             <div class="kpi-value" id="kpiVazaoValue">--</div>
                             <div class="kpi-label">Vazão Média (L/min)</div>
                         </div>
                         <div class="kpi-card" id="kpiDuracao">
                             <div class="kpi-icon">⏱️</div>
-                            <div class="kpi-value" id="kpiDuracaoValue">--</div>
+                            <div class="kpi-value kpi-value-small" id="kpiDuracaoValue">--</div>
                             <div class="kpi-label">Duração do Teste</div>
                         </div>
                     </div>
@@ -1607,13 +1610,13 @@
                         <div class="print-footer-left">
                             <p><strong>Hidráulicos Fenili</strong> | Caçador - SC</p>
                             <p>Certificação Eng. Responsável: _______________</p>
-                            <p>📱 (49) 99120-8836 | 📧 jpdiniz5@gmail.com</p>
+                            <p>📱 (49) 3567-1442 | 📧contato@hidraulicosfenili.com.br</p>
                             <p><strong>GMA Elétrica e Automação</strong> - Todos Direitos Reservados.</p>
                         </div>
                         <div class="print-footer-right">
                             <p><strong>Cliente:</strong> <span class="print-client-name"></span></p>
-                            <p><strong>Empresa:</strong> _______________</p>
-                            <p><strong>Contato:</strong> _______________</p>
+                            <p><strong>Empresa:</strong> __________________</p>
+                            <p><strong>Contato:</strong> __________________</p>
                             <p><strong>Assinatura:</strong> _______________</p>
                         </div>
                     </div>
@@ -1627,7 +1630,7 @@
         <!-- Footer -->
         <div class="footer">
             <p><strong>Hidráulicos Fenili</strong> | Rod. Honorino Moro, 4911 - Figueroa, Caçador - SC, 89503-155</p>
-            <p>📱 (49) 3567-1442 | 📧 contato@hidraulicosfenili.com.br </p>
+            <p>📱 (49) 3567-1442 | 📧contato@hidraulicosfenili.com.br</p>
             <p><strong>GMA Elétrica e Automação</strong> - Todos Direitos Reservados.</p>
         </div>
     </div>
@@ -2072,52 +2075,21 @@
             const maxPressao = Math.max(...allPressures.filter(v => !isNaN(v)));
             document.getElementById('kpiPressaoValue').textContent = maxPressao.toFixed(1);
             
-            // Classificar pressão com semáforo
-            const kpiPressaoCard = document.getElementById('kpiPressaoMax');
-            const kpiPressaoBadge = document.getElementById('kpiPressaoBadge');
-            kpiPressaoCard.classList.remove('success', 'warning', 'danger');
-            if (maxPressao < 300) {
-                kpiPressaoCard.classList.add('success');
-                kpiPressaoBadge.textContent = 'OK';
-                kpiPressaoBadge.className = 'kpi-badge ok';
-            } else if (maxPressao < 380) {
-                kpiPressaoCard.classList.add('warning');
-                kpiPressaoBadge.textContent = 'ALERTA';
-                kpiPressaoBadge.className = 'kpi-badge alerta';
-            } else {
-                kpiPressaoCard.classList.add('danger');
-                kpiPressaoBadge.textContent = 'CRÍTICO';
-                kpiPressaoBadge.className = 'kpi-badge critico';
-            }
-            
             // Vazão média
             const vazaoValues = csvData.map(d => d.vazao).filter(v => !isNaN(v));
             const avgVazao = vazaoValues.reduce((a, b) => a + b, 0) / vazaoValues.length;
             document.getElementById('kpiVazaoValue').textContent = avgVazao.toFixed(1);
             
-            // Classificar vazão com semáforo
-            const kpiVazaoCard = document.getElementById('kpiVazaoMedia');
-            const kpiVazaoBadge = document.getElementById('kpiVazaoBadge');
-            kpiVazaoCard.classList.remove('success', 'warning', 'danger');
-            if (avgVazao > 20) {
-                kpiVazaoCard.classList.add('success');
-                kpiVazaoBadge.textContent = 'OK';
-                kpiVazaoBadge.className = 'kpi-badge ok';
-            } else if (avgVazao > 10) {
-                kpiVazaoCard.classList.add('warning');
-                kpiVazaoBadge.textContent = 'BAIXA';
-                kpiVazaoBadge.className = 'kpi-badge alerta';
-            } else {
-                kpiVazaoCard.classList.add('danger');
-                kpiVazaoBadge.textContent = 'CRÍTICO';
-                kpiVazaoBadge.className = 'kpi-badge critico';
-            }
-            
-            // Duração do teste
+            // Duração do teste (só hora HH:MM:SS)
             if (csvData.length >= 2) {
                 const firstTime = csvData[0].timestamp;
                 const lastTime = csvData[csvData.length - 1].timestamp;
-                document.getElementById('kpiDuracaoValue').textContent = `${firstTime.split(' ').pop()} - ${lastTime.split(' ').pop()}`;
+                
+                // Extrair apenas a hora (último elemento após split por espaço)
+                const horaInicio = firstTime.split(' ').pop();
+                const horaFim = lastTime.split(' ').pop();
+                
+                document.getElementById('kpiDuracaoValue').textContent = `${horaInicio} - ${horaFim}`;
             }
         }
         
