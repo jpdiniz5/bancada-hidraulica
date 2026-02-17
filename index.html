@@ -780,7 +780,7 @@
             height: 450px;
         }
 
-        #pressureChart {
+        #pressureChart, #vazaoChart {
             width: 100% !important;
             height: 100% !important;
         }
@@ -1051,6 +1051,14 @@
                 margin-bottom: 0 !important;
             }
 
+            /* Manter spans no print */
+            .form-group[style*="span 2"] {
+                grid-column: span 2 !important;
+            }
+            .form-group[style*="span 4"] {
+                grid-column: span 4 !important;
+            }
+
             .form-group {
                 margin-bottom: 0 !important;
             }
@@ -1102,6 +1110,14 @@
             .chart-controls {
                 display: none !important;
             }
+            /* KPI Cards compactos na impressão */
+            .kpi-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 4px !important; margin-bottom: 6px !important; }
+            .kpi-card { padding: 4px 3px !important; border-radius: 3px !important; box-shadow: none !important; }
+            .kpi-icon { font-size: 1rem !important; margin-bottom: 2px !important; }
+            .kpi-value { font-size: 0.7rem !important; }
+            .kpi-value.kpi-value-small { font-size: 0.55rem !important; }
+            .kpi-label { font-size: 0.45rem !important; margin-top: 1px !important; }
+            .kpi-badge { display: none !important; }
 
             .chart-section {
                 page-break-before: always !important;
@@ -1130,7 +1146,7 @@
                 border-radius: 0 !important;
             }
 
-            #pressureChart {
+            #pressureChart, #vazaoChart {
                 width: 100% !important;
                 height: 480px !important;
                 max-height: 480px !important;
@@ -1442,7 +1458,8 @@
                         <button class="toggle-btn" onclick="toggleSection('formContent')">▼ Expandir/Recolher</button>
                     </h2>
                     <div class="section-content" id="formContent">
-                        <div class="form-grid">
+                        <div class="form-grid" style="grid-template-columns: repeat(4, 1fr);">
+                            <!-- Linha 1: ID do Teste + Data + Hora Início + Hora Fim -->
                             <div class="form-group">
                                 <label>ID do Teste</label>
                                 <input type="text" id="testId" placeholder="Ex: 001">
@@ -1452,40 +1469,43 @@
                                 <input type="date" id="testDate">
                             </div>
                             <div class="form-group">
+                                <label>Hora Início</label>
+                                <input type="time" id="startTime">
+                            </div>
+                            <div class="form-group">
+                                <label>Hora Fim</label>
+                                <input type="time" id="endTime">
+                            </div>
+                            <!-- Linha 2: Cliente + Operador -->
+                            <div class="form-group" style="grid-column: span 2;">
                                 <label>Cliente</label>
                                 <input type="text" id="clientName" placeholder="Nome do cliente">
                             </div>
-                            <div class="form-group">
-                                <label>Hora Início</label>
-                                <input type="time" id="startTime">
+                            <div class="form-group" style="grid-column: span 2;">
+                                <label>Operador</label>
+                                <input type="text" id="operator" placeholder="Nome do operador">
+                            </div>
+                            <!-- Linha 3: Equipamento (linha inteira) -->
+                            <div class="form-group" style="grid-column: span 4;">
+                                <label>Equipamento</label>
+                                <input type="text" id="equipment" placeholder="Ex: Bomba Hidráulica">
+                            </div>
+                            <!-- Linha 4: Tipo de Teste (linha inteira) -->
+                            <div class="form-group" style="grid-column: span 4;">
+                                <label>Tipo de Teste</label>
+                                <select id="testType">
+                                    <option value="">Selecione...</option>
+                                    <option>Vazão e Pressão</option>
+                                    <option>Torque</option>
+                                    <option>Vedação</option>
+                                    <option>Resposta</option>
+                                    <option>Pressão Máxima</option>
+                                    <option>Eficiência Volumétrica</option>
+                                    <option>Vazamento Interno</option>
+                                    <option>Ciclo Completo</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>Equipamento</label>
-                            <input type="text" id="equipment" placeholder="Ex: Bomba Hidráulica">
-                        </div>
-                        <div class="form-group">
-                            <label>Hora Fim</label>
-                            <input type="time" id="endTime">
-                        </div>
-                        <div class="form-group">
-                            <label>Operador</label>
-                            <input type="text" id="operator" placeholder="Nome do operador">
-                        </div>
-                        <div class="form-group">
-                            <label>Tipo de Teste</label>
-                            <select id="testType">
-                                <option value="">Selecione...</option>
-                                <option>Vazão e Pressão</option>
-                                <option>Torque</option>
-                                <option>Vedação</option>
-                                <option>Resposta</option>
-                                <option>Pressão Máxima</option>
-                                <option>Eficiência Volumétrica</option>
-                                <option>Vazamento Interno</option>
-                                <option>Ciclo Completo</option>
-                            </select>
-                        </div>
-                    </div>
                     </div>
                 </div>
 
@@ -1562,6 +1582,18 @@
                     </div>
                     <div class="chart-container">
                         <canvas id="pressureChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Gráfico de Vazão (separado) -->
+                <div class="form-section chart-section">
+                    <h2 class="section-title">📈 Gráfico de Vazão</h2>
+                    <div class="chart-controls">
+                        <span class="zoom-hint">🔍 Arraste para zoom | Scroll para zoom | Ctrl+Arraste para mover</span>
+                        <button class="btn-reset-zoom" onclick="resetZoomVazao()">↺ Resetar Zoom</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="vazaoChart"></canvas>
                     </div>
                 </div>
 
@@ -1874,6 +1906,7 @@
         // Global variables
         let csvData = [];
         let chart = null;
+        let chartVazao = null;
         let appInitialized = false;
 
         // Initialize
@@ -1932,35 +1965,37 @@
             document.getElementById('loading').classList.add('show');
 
             // Read file
-            const reader = new FileReader();
-
-            reader.onload = function(e) {
-                try {
-                    const text = e.target.result;
-                    parseCSV(text);
-                    
-                    // Hide loading
-                    setTimeout(() => {
-                        document.getElementById('loading').classList.remove('show');
-                        showAlert('✅ Dados importados com sucesso! ' + csvData.length + ' linhas processadas.', 'success');
-                        
-                        // Show dashboard
-                        document.getElementById('dashboard').classList.remove('hidden');
-                        
-                        // Update print footer
-                        updatePrintFooter();
-                        
-                        // Scroll to dashboard
-                        document.getElementById('dashboard').scrollIntoView({ behavior: 'smooth' });
-                    }, 1000);
-                    
-                } catch (error) {
-                    document.getElementById('loading').classList.remove('show');
-                    showAlert('❌ Erro ao processar arquivo: ' + error.message, 'danger');
-                }
+            // Auto-detectar encoding (UTF-8 ou UTF-16LE do Delta PLC)
+            const tryReadFile = (encoding) => {
+                const r = new FileReader();
+                r.onload = function(ev) {
+                    const text = ev.target.result;
+                    // Se UTF-8 gerar texto com null bytes, é UTF-16LE
+                    if (encoding === 'UTF-8' && text.includes('\u0000')) {
+                        tryReadFile('UTF-16LE');
+                        return;
+                    }
+                    try {
+                        parseCSV(text);
+                        setTimeout(() => {
+                            document.getElementById('loading').classList.remove('show');
+                            showAlert('✅ Dados importados com sucesso! ' + csvData.length + ' linhas processadas.', 'success');
+                            document.getElementById('dashboard').classList.remove('hidden');
+                            updatePrintFooter();
+                            document.getElementById('dashboard').scrollIntoView({ behavior: 'smooth' });
+                        }, 1000);
+                    } catch (error) {
+                        if (encoding === 'UTF-8') {
+                            tryReadFile('UTF-16LE');
+                        } else {
+                            document.getElementById('loading').classList.remove('show');
+                            showAlert('❌ Erro ao processar arquivo: ' + error.message, 'danger');
+                        }
+                    }
+                };
+                r.readAsText(file, encoding);
             };
-
-            reader.readAsText(file, 'UTF-16LE');
+            tryReadFile('UTF-8');
         }
 
         function parseCSV(text) {
@@ -1989,7 +2024,7 @@
 
             // Detectar separador (TAB ou vírgula)
             const firstDataLine = lines.find((l, i) => i > 0 && l.trim());
-            const separator = firstDataLine && firstDataLine.includes('\t') ? '\t' : ',';
+            const separator = firstDataLine && firstDataLine.includes('\t') ? '\t' : (firstDataLine && firstDataLine.includes(';') ? ';' : ',');
 
             // Skip header, process data
             for (let i = 1; i < lines.length; i++) {
@@ -2127,200 +2162,75 @@
 
         function createChart() {
             const ctx = document.getElementById('pressureChart').getContext('2d');
+            const ctxVazao = document.getElementById('vazaoChart').getContext('2d');
 
-            // Destroy previous chart
-            if (chart) {
-                chart.destroy();
-            }
+            if (chart) { chart.destroy(); }
+            if (chartVazao) { chartVazao.destroy(); }
 
-            // Prepare data - usar timestamps como labels
-            const labels = csvData.map(d => d.timestamp);
-            
-            // Otimização: reduzir pontos se houver muitos dados
             const maxPoints = 500;
             let step = 1;
             let displayData = csvData;
-            
             if (csvData.length > maxPoints) {
                 step = Math.ceil(csvData.length / maxPoints);
                 displayData = csvData.filter((_, i) => i % step === 0);
             }
-            
             const displayLabels = displayData.map(d => d.timestamp);
 
+            // GRÁFICO DE PRESSÕES (sem vazão)
             chart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: displayLabels,
                     datasets: [
-                        {
-                            label: 'SPT001 (400bar)',
-                            data: displayData.map(d => d.spt001),
-                            borderColor: '#FF6B35',
-                            backgroundColor: 'rgba(255, 107, 53, 0.1)',
-                            tension: 0.2,
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            pointHoverRadius: 4
-                        },
-                        {
-                            label: 'SPT002 (400bar)',
-                            data: displayData.map(d => d.spt002),
-                            borderColor: '#00D4FF',
-                            backgroundColor: 'rgba(0, 212, 255, 0.1)',
-                            tension: 0.2,
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            pointHoverRadius: 4
-                        },
-                        {
-                            label: 'SPT003 (250bar)',
-                            data: displayData.map(d => d.spt003),
-                            borderColor: '#FFB300',
-                            backgroundColor: 'rgba(255, 179, 0, 0.1)',
-                            tension: 0.2,
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            pointHoverRadius: 4
-                        },
-                        {
-                            label: 'SPT004 (100bar)',
-                            data: displayData.map(d => d.spt004),
-                            borderColor: '#00C853',
-                            backgroundColor: 'rgba(0, 200, 83, 0.1)',
-                            tension: 0.2,
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            pointHoverRadius: 4
-                        },
-                        {
-                            label: 'SPT005 (100bar)',
-                            data: displayData.map(d => d.spt005),
-                            borderColor: '#9C27B0',
-                            backgroundColor: 'rgba(156, 39, 176, 0.1)',
-                            tension: 0.2,
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            pointHoverRadius: 4
-                        },
-                        {
-                            label: 'SPT006 (100bar)',
-                            data: displayData.map(d => d.spt006),
-                            borderColor: '#3F51B5',
-                            backgroundColor: 'rgba(63, 81, 181, 0.1)',
-                            tension: 0.2,
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            pointHoverRadius: 4
-                        },
-                        {
-                            label: 'Vazão (L/min)',
-                            data: displayData.map(d => d.vazao),
-                            borderColor: '#E91E63',
-                            backgroundColor: 'rgba(233, 30, 99, 0.1)',
-                            tension: 0.2,
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            pointRadius: 0,
-                            pointHoverRadius: 4,
-                            yAxisID: 'y1'
-                        }
+                        { label: 'SPT001 (400bar)', data: displayData.map(d => d.spt001), borderColor: '#FF6B35', backgroundColor: 'rgba(255,107,53,0.1)', tension: 0.2, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4 },
+                        { label: 'SPT002 (400bar)', data: displayData.map(d => d.spt002), borderColor: '#00D4FF', backgroundColor: 'rgba(0,212,255,0.1)', tension: 0.2, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4 },
+                        { label: 'SPT003 (250bar)', data: displayData.map(d => d.spt003), borderColor: '#FFB300', backgroundColor: 'rgba(255,179,0,0.1)', tension: 0.2, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4 },
+                        { label: 'SPT004 (100bar)', data: displayData.map(d => d.spt004), borderColor: '#00C853', backgroundColor: 'rgba(0,200,83,0.1)', tension: 0.2, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4 },
+                        { label: 'SPT005 (100bar)', data: displayData.map(d => d.spt005), borderColor: '#9C27B0', backgroundColor: 'rgba(156,39,176,0.1)', tension: 0.2, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4 },
+                        { label: 'SPT006 (100bar)', data: displayData.map(d => d.spt006), borderColor: '#3F51B5', backgroundColor: 'rgba(63,81,181,0.1)', tension: 0.2, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4 }
                     ]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
-                    },
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
                     plugins: {
-                        title: {
-                            display: true,
-                            text: 'Evolução das Pressões e Vazão Durante o Teste',
-                            font: { size: 16, weight: 'bold' }
-                        },
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                usePointStyle: true,
-                                padding: 15
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0,0,0,0.8)',
-                            titleFont: { size: 13 },
-                            bodyFont: { size: 12 },
-                            padding: 12,
-                            displayColors: true
-                        },
-                        zoom: {
-                            pan: {
-                                enabled: true,
-                                mode: 'xy',
-                                modifierKey: 'ctrl'
-                            },
-                            zoom: {
-                                wheel: {
-                                    enabled: true,
-                                    speed: 0.1
-                                },
-                                pinch: {
-                                    enabled: true
-                                },
-                                drag: {
-                                    enabled: true,
-                                    backgroundColor: 'rgba(0,212,255,0.2)',
-                                    borderColor: 'rgba(0,212,255,0.8)',
-                                    borderWidth: 1
-                                },
-                                mode: 'xy'
-                            }
-                        }
+                        title: { display: true, text: 'Evolução das Pressões Durante o Teste', font: { size: 16, weight: 'bold' } },
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 15 } },
+                        tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', titleFont: { size: 13 }, bodyFont: { size: 12 }, padding: 12, displayColors: true },
+                        zoom: { pan: { enabled: true, mode: 'xy', modifierKey: 'ctrl' }, zoom: { wheel: { enabled: true, speed: 0.1 }, pinch: { enabled: true }, drag: { enabled: true, backgroundColor: 'rgba(0,212,255,0.2)', borderColor: 'rgba(0,212,255,0.8)', borderWidth: 1 }, mode: 'xy' } }
                     },
                     scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {
-                                display: true,
-                                text: 'Pressão (bar)',
-                                font: { weight: 'bold' }
-                            },
-                            grid: {
-                                color: 'rgba(0,0,0,0.05)'
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {
-                                display: true,
-                                text: 'Vazão (L/min)',
-                                font: { weight: 'bold' }
-                            },
-                            grid: {
-                                drawOnChartArea: false
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Tempo',
-                                font: { weight: 'bold' }
-                            },
-                            grid: {
-                                color: 'rgba(0,0,0,0.05)'
-                            },
-                            ticks: {
-                                maxRotation: 45,
-                                minRotation: 0,
-                                autoSkip: true,
-                                maxTicksLimit: 20
-                            }
-                        }
+                        y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Pressão (bar)', font: { weight: 'bold' } }, grid: { color: 'rgba(0,0,0,0.05)' } },
+                        x: { title: { display: true, text: 'Tempo', font: { weight: 'bold' } }, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 20 } }
+                    }
+                }
+            });
+
+            // GRÁFICO DE VAZÃO (independente)
+            chartVazao = new Chart(ctxVazao, {
+                type: 'line',
+                data: {
+                    labels: displayLabels,
+                    datasets: [{
+                        label: 'Vazão (L/min)',
+                        data: displayData.map(d => d.vazao),
+                        borderColor: '#E91E63',
+                        backgroundColor: 'rgba(233,30,99,0.15)',
+                        fill: true, tension: 0.2, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        title: { display: true, text: 'Evolução da Vazão Durante o Teste', font: { size: 16, weight: 'bold' } },
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 15 } },
+                        tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', titleFont: { size: 13 }, bodyFont: { size: 12 }, padding: 12, displayColors: true },
+                        zoom: { pan: { enabled: true, mode: 'xy', modifierKey: 'ctrl' }, zoom: { wheel: { enabled: true, speed: 0.1 }, pinch: { enabled: true }, drag: { enabled: true, backgroundColor: 'rgba(233,30,99,0.2)', borderColor: 'rgba(233,30,99,0.8)', borderWidth: 1 }, mode: 'xy' } }
+                    },
+                    scales: {
+                        y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Vazão (L/min)', font: { weight: 'bold' } }, grid: { color: 'rgba(0,0,0,0.05)' } },
+                        x: { title: { display: true, text: 'Tempo', font: { weight: 'bold' } }, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 20 } }
                     }
                 }
             });
@@ -2332,18 +2242,25 @@
                 chart.resetZoom();
             }
         }
+        
+        function resetZoomVazao() {
+            if (chartVazao) {
+                chartVazao.resetZoom();
+            }
+        }
 
         // Redimensionar gráfico para impressão
         window.addEventListener('beforeprint', function() {
             if (chart) {
-                // Salvar tamanho original
                 chart.originalHeight = chart.canvas.parentNode.style.height;
-                
-                // Ajustar para impressão
                 chart.canvas.parentNode.style.height = '500px';
                 chart.resize();
             }
-            
+            if (chartVazao) {
+                chartVazao.originalHeight = chartVazao.canvas.parentNode.style.height;
+                chartVazao.canvas.parentNode.style.height = '500px';
+                chartVazao.resize();
+            }
             // Atualizar observações para impressão
             const obs = document.getElementById('observations');
             const obsPrint = document.getElementById('observationsPrint');
@@ -2354,9 +2271,12 @@
 
         window.addEventListener('afterprint', function() {
             if (chart) {
-                // Restaurar tamanho original
                 chart.canvas.parentNode.style.height = chart.originalHeight || '450px';
                 chart.resize();
+            }
+            if (chartVazao) {
+                chartVazao.canvas.parentNode.style.height = chartVazao.originalHeight || '450px';
+                chartVazao.resize();
             }
         });
 
@@ -2380,6 +2300,10 @@
             if (chart) {
                 chart.destroy();
                 chart = null;
+            }
+            if (chartVazao) {
+                chartVazao.destroy();
+                chartVazao = null;
             }
             document.getElementById('dataTableBody').innerHTML = '<tr><td colspan="8">Nenhum dado importado</td></tr>';
             // Limpar estatísticas
