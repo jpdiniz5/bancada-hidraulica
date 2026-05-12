@@ -1927,13 +1927,15 @@
                     ['regNome','regEmail','regEmpresa','regTelefone'].forEach(function(id) {
                         document.getElementById(id).value = '';
                     });
-                    // Notificar admin por email (fire-and-forget)
+                    // Notificar admin por email
                     fetch(SUPABASE_URL + '/functions/v1/enviar-licenca', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
                         body: JSON.stringify({ modo: 'notificacao', nome: nome, email: email, empresa: empresa, telefone: telefone }),
-                        signal: AbortSignal.timeout(15000)
-                    }).catch(function() {});
+                        signal: AbortSignal.timeout(20000)
+                    }).then(function(r) {
+                        return r.json().then(function(d) { console.log('[notif admin]', r.status, d); });
+                    }).catch(function(e) { console.warn('[notif admin] erro:', e); });
                 }
             } catch (e) {
                 errorEl.textContent = e.name === 'TimeoutError' ? 'Tempo esgotado. Tente novamente.' : 'Erro de conexao. Verifique sua internet.';
