@@ -1771,12 +1771,26 @@
             return Math.abs(hash).toString(36);
         }
 
+        async function rpc(funcao, params) {
+            const resp = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + funcao, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                },
+                body: JSON.stringify(params),
+                signal: AbortSignal.timeout(15000)
+            });
+            const data = await resp.json();
+            return { data, error: resp.ok ? null : data };
+        }
+
         async function checkLicense() {
             const token = localStorage.getItem(SESSION_KEY);
             if (!token) { showActivationScreen(); return; }
-
             try {
-                const { data, error } = await db.rpc('verificar_sessao', { p_token: token });
+                const { data, error } = await rpc('verificar_sessao', { p_token: token });
                 if (error || !data?.ok) {
                     localStorage.removeItem(SESSION_KEY);
                     showActivationScreen();
@@ -1809,12 +1823,11 @@
             btn.disabled = true;
 
             try {
-                const { data, error } = await db.rpc('validar_chave', {
+                const { data, error } = await rpc('validar_chave', {
                     p_chave:       key,
                     p_fingerprint: getFingerprint(),
                     p_user_agent:  navigator.userAgent
                 });
-
                 if (error || !data?.ok) {
                     errorEl.textContent = data?.mensagem || 'Chave invalida. Tente novamente.';
                     errorEl.classList.add('show');
@@ -1826,7 +1839,7 @@
                     initApp();
                 }
             } catch (e) {
-                errorEl.textContent = 'Erro de conexao. Verifique sua internet.';
+                errorEl.textContent = e.name === 'TimeoutError' ? 'Tempo esgotado. Tente novamente.' : 'Erro de conexao. Verifique sua internet.';
                 errorEl.classList.add('show');
             } finally {
                 btn.textContent = originalText;
@@ -1852,12 +1865,11 @@
             btn.disabled = true;
 
             try {
-                const { data, error } = await db.rpc('validar_chave', {
+                const { data, error } = await rpc('validar_chave', {
                     p_chave:       key,
                     p_fingerprint: getFingerprint(),
                     p_user_agent:  navigator.userAgent
                 });
-
                 if (error || !data?.ok) {
                     errorEl.textContent = data?.mensagem || 'Chave invalida.';
                     errorEl.classList.add('show');
@@ -1869,7 +1881,7 @@
                     initApp();
                 }
             } catch (e) {
-                errorEl.textContent = 'Erro de conexao. Verifique sua internet.';
+                errorEl.textContent = e.name === 'TimeoutError' ? 'Tempo esgotado. Tente novamente.' : 'Erro de conexao. Verifique sua internet.';
                 errorEl.classList.add('show');
             } finally {
                 btn.textContent = originalText;
@@ -1878,10 +1890,10 @@
         }
 
         async function solicitarAcesso() {
-            const nome      = document.getElementById('regNome').value.trim();
-            const email     = document.getElementById('regEmail').value.trim();
-            const empresa   = document.getElementById('regEmpresa').value.trim();
-            const telefone  = document.getElementById('regTelefone').value.trim();
+            const nome     = document.getElementById('regNome').value.trim();
+            const email    = document.getElementById('regEmail').value.trim();
+            const empresa  = document.getElementById('regEmpresa').value.trim();
+            const telefone = document.getElementById('regTelefone').value.trim();
             const errorEl   = document.getElementById('regError');
             const successEl = document.getElementById('regSuccess');
 
@@ -1900,13 +1912,12 @@
             btn.disabled = true;
 
             try {
-                const { data, error } = await db.rpc('solicitar_acesso', {
+                const { data, error } = await rpc('solicitar_acesso', {
                     p_nome:     nome,
                     p_email:    email,
                     p_empresa:  empresa  || null,
                     p_telefone: telefone || null
                 });
-
                 if (error || !data?.ok) {
                     errorEl.textContent = data?.mensagem || 'Erro ao enviar. Tente novamente.';
                     errorEl.classList.add('show');
@@ -1918,7 +1929,7 @@
                     });
                 }
             } catch (e) {
-                errorEl.textContent = 'Erro de conexao. Verifique sua internet.';
+                errorEl.textContent = e.name === 'TimeoutError' ? 'Tempo esgotado. Tente novamente.' : 'Erro de conexao. Verifique sua internet.';
                 errorEl.classList.add('show');
             } finally {
                 btn.textContent = originalText;
