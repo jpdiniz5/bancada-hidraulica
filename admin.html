@@ -380,11 +380,61 @@
 
 <script>
     const SUPABASE_URL = 'https://hbhjvmfanctuhpunhxhf.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiaGp2bWZhbmN0dWhwdW5oeGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1Mzc1NTIsImV4cCI6MjA5NDExMzU1Mn0.U5ADBbVKP710IPjAgffLS2FRf2BE_gh2k9W8z53kwfk';
-    const { createClient } = supabase;
-    const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiaGp2bWZhbmN0dWhwdW5oeGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1Mzc1NTIsImV4cCI6MjA5NDExMzU1Mn0.U5ADBbVKP710IPjAgffLS2FRf2BE_gh2k9W8z53kwfk';
 
+    let authToken = null;
     let currentClienteId = null;
+
+    // ===== HTTP HELPERS =====
+    function getHeaders(extra = {}) {
+        return {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': 'Bearer ' + (authToken || SUPABASE_ANON_KEY),
+            ...extra
+        };
+    }
+
+    async function apiFetch(path, options = {}) {
+        return fetch(SUPABASE_URL + path, {
+            ...options,
+            headers: { ...getHeaders(), ...(options.headers || {}) },
+            signal: AbortSignal.timeout(15000)
+        });
+    }
+
+    async function dbGet(table, params = {}) {
+        const qs = new URLSearchParams(params).toString();
+        const resp = await apiFetch(`/rest/v1/${table}${qs ? '?' + qs : ''}`);
+        if (!resp.ok) return { data: null, error: true };
+        return { data: await resp.json(), error: null };
+    }
+
+    async function dbCount(table, filterParams = {}) {
+        const params = new URLSearchParams({ ...filterParams, select: 'id' }).toString();
+        const resp = await apiFetch(`/rest/v1/${table}?${params}`, {
+            headers: { 'Prefer': 'count=exact', 'Range': '0-0' }
+        });
+        const cr = resp.headers.get('Content-Range') || '';
+        const m = cr.match(/\/(\d+)$/);
+        return m ? parseInt(m[1]) : 0;
+    }
+
+    async function dbUpdate(table, id, body) {
+        const resp = await apiFetch(`/rest/v1/${table}?id=eq.${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(body)
+        });
+        return { error: resp.ok ? null : true };
+    }
+
+    async function dbInsert(table, body) {
+        const resp = await apiFetch(`/rest/v1/${table}`, {
+            method: 'POST',
+            body: JSON.stringify(body)
+        });
+        return { error: resp.ok ? null : true };
+    }
 
     // ===== AUTH =====
     async function doLogin() {
@@ -395,25 +445,42 @@
         err.style.display = 'none';
         btn.textContent = 'Entrando...'; btn.disabled = true;
 
-        const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
-        btn.textContent = 'Entrar'; btn.disabled = false;
+        try {
+            const resp = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+                body: JSON.stringify({ email, password: pass }),
+                signal: AbortSignal.timeout(15000)
+            });
+            const data = await resp.json();
+            btn.textContent = 'Entrar'; btn.disabled = false;
 
-        if (error) {
-            err.textContent = 'Email ou senha incorretos.';
+            if (!resp.ok) {
+                err.textContent = 'Email ou senha incorretos.';
+                err.style.display = 'block';
+                return;
+            }
+
+            authToken = data.access_token;
+
+            // Verificar se é admin
+            const aResp = await apiFetch(`/rest/v1/admins?select=email&email=eq.${encodeURIComponent(email)}`);
+            const admins = await aResp.json();
+            if (!Array.isArray(admins) || admins.length === 0) {
+                authToken = null;
+                err.textContent = 'Acesso não autorizado para este email.';
+                err.style.display = 'block';
+                return;
+            }
+
+            localStorage.setItem('gde_admin_token', authToken);
+            localStorage.setItem('gde_admin_email', email);
+            showAdmin(email);
+        } catch (e) {
+            btn.textContent = 'Entrar'; btn.disabled = false;
+            err.textContent = 'Erro de conexão. Tente novamente.';
             err.style.display = 'block';
-            return;
         }
-
-        // Verificar se é admin
-        const { data: adminRow } = await db.from('admins').select('email').eq('email', data.user.email).maybeSingle();
-        if (!adminRow) {
-            await db.auth.signOut();
-            err.textContent = 'Acesso não autorizado para este email.';
-            err.style.display = 'block';
-            return;
-        }
-
-        showAdmin(data.user.email);
     }
 
     document.addEventListener('keypress', function(e) {
@@ -421,7 +488,10 @@
     });
 
     async function doLogout() {
-        await db.auth.signOut();
+        try { await apiFetch('/auth/v1/logout', { method: 'POST' }); } catch (_) {}
+        authToken = null;
+        localStorage.removeItem('gde_admin_token');
+        localStorage.removeItem('gde_admin_email');
         document.getElementById('adminApp').classList.remove('show');
         document.getElementById('loginScreen').classList.remove('hidden');
         document.getElementById('loginPass').value = '';
@@ -435,12 +505,22 @@
     }
 
     // Auto-login se já tem sessão
-    db.auth.onAuthStateChange(async (event, session) => {
-        if (session) {
-            const { data: adminRow } = await db.from('admins').select('email').eq('email', session.user.email).maybeSingle();
-            if (adminRow) showAdmin(session.user.email);
-        }
-    });
+    (async function restoreSession() {
+        const token = localStorage.getItem('gde_admin_token');
+        const email = localStorage.getItem('gde_admin_email');
+        if (!token || !email) return;
+        authToken = token;
+        try {
+            const aResp = await apiFetch(`/rest/v1/admins?select=email&email=eq.${encodeURIComponent(email)}`);
+            if (aResp.ok) {
+                const admins = await aResp.json();
+                if (Array.isArray(admins) && admins.length > 0) { showAdmin(email); return; }
+            }
+        } catch (_) {}
+        authToken = null;
+        localStorage.removeItem('gde_admin_token');
+        localStorage.removeItem('gde_admin_email');
+    })();
 
     // ===== TABS =====
     function switchTab(name, el) {
@@ -456,15 +536,11 @@
 
     // ===== STATS =====
     async function loadStats() {
-        const [{ count: total },
-               { count: pendentes },
-               { count: ativos },
-               { count: acessos }] = await Promise.all([
-            db.from('clientes').select('*', { count: 'exact', head: true }),
-            db.from('clientes').select('*', { count: 'exact', head: true }).eq('status', 'pendente'),
-            db.from('clientes').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
-            db.from('log_acesso').select('*', { count: 'exact', head: true })
-              .eq('evento', 'validado').gte('created_at', new Date().toISOString().slice(0,10))
+        const [total, pendentes, ativos, acessos] = await Promise.all([
+            dbCount('clientes'),
+            dbCount('clientes', { status: 'eq.pendente' }),
+            dbCount('clientes', { status: 'eq.ativo' }),
+            dbCount('log_acesso', { evento: 'eq.validado', created_at: `gte.${new Date().toISOString().slice(0,10)}` })
         ]);
         document.getElementById('statTotal').textContent    = total    ?? 0;
         document.getElementById('statPendentes').textContent = pendentes ?? 0;
@@ -478,7 +554,7 @@
     async function loadPendentes() {
         const tbody = document.getElementById('tbodyPendentes');
         tbody.innerHTML = '<tr class="loading-row"><td colspan="6">Carregando...</td></tr>';
-        const { data } = await db.from('clientes').select('*').eq('status', 'pendente').order('created_at', { ascending: false });
+        const { data } = await dbGet('clientes', { status: 'eq.pendente', order: 'created_at.desc' });
         if (!data || data.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted)">✅ Nenhum cliente pendente</td></tr>';
             return;
@@ -504,12 +580,12 @@
     async function loadClientes() {
         const tbody = document.getElementById('tbodyClientes');
         tbody.innerHTML = '<tr class="loading-row"><td colspan="6">Carregando...</td></tr>';
-        let q = db.from('clientes').select('*').order('created_at', { ascending: false });
+        const params = { order: 'created_at.desc' };
         const status = document.getElementById('filterStatus').value;
         const search = document.getElementById('searchClientes').value.trim();
-        if (status) q = q.eq('status', status);
-        if (search) q = q.or(`nome.ilike.%${search}%,email.ilike.%${search}%`);
-        const { data } = await q;
+        if (status) params.status = 'eq.' + status;
+        if (search) params.or = `nome.ilike.%${search}%,email.ilike.%${search}%`;
+        const { data } = await dbGet('clientes', params);
         if (!data || data.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted)">Nenhum cliente encontrado</td></tr>';
             return;
@@ -535,9 +611,7 @@
     async function loadLicencas() {
         const tbody = document.getElementById('tbodyLicencas');
         tbody.innerHTML = '<tr class="loading-row"><td colspan="8">Carregando...</td></tr>';
-        const { data } = await db.from('licencas')
-            .select('*, clientes(nome, email)')
-            .order('created_at', { ascending: false });
+        const { data } = await dbGet('licencas', { select: '*,clientes(nome,email)', order: 'created_at.desc' });
         if (!data || data.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Nenhuma licença encontrada</td></tr>';
             return;
@@ -568,7 +642,7 @@
     async function loadLogs() {
         const tbody = document.getElementById('tbodyLogs');
         tbody.innerHTML = '<tr class="loading-row"><td colspan="5">Carregando...</td></tr>';
-        const { data } = await db.from('log_acesso').select('*').order('created_at', { ascending: false }).limit(200);
+        const { data } = await dbGet('log_acesso', { order: 'created_at.desc', limit: '200' });
         if (!data || data.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">Nenhum log encontrado</td></tr>';
             return;
@@ -605,19 +679,20 @@
         const expir = document.getElementById('apvExpiracao').value;
         btn.textContent = 'Processando...'; btn.disabled = true;
 
-        const { error: errStatus } = await db.from('clientes').update({ status: 'ativo' }).eq('id', currentClienteId);
+        const { error: errStatus } = await dbUpdate('clientes', currentClienteId, { status: 'ativo' });
         if (errStatus) { toast('Erro ao aprovar cliente.', 'error'); btn.textContent = 'Aprovar e Gerar Chave'; btn.disabled = false; return; }
 
-        const chave = await gerarChave();
+        const chave = gerarChave();
         const payload = { cliente_id: currentClienteId, chave, tipo };
         if (expir) payload.data_expiracao = new Date(expir).toISOString();
 
-        const { error: errLic } = await db.from('licencas').insert(payload);
+        const { error: errLic } = await dbInsert('licencas', payload);
         btn.textContent = 'Aprovar e Gerar Chave'; btn.disabled = false;
 
         if (errLic) { toast('Aprovado, mas erro ao gerar chave.', 'error'); return; }
         closeModal('modalAprovar');
         mostrarChave(chave);
+        loadAll();
     }
 
     function abrirStatus(id, nome, statusAtual) {
@@ -629,7 +704,7 @@
 
     async function confirmarStatus() {
         const status = document.getElementById('suspStatus').value;
-        const { error } = await db.from('clientes').update({ status }).eq('id', currentClienteId);
+        const { error } = await dbUpdate('clientes', currentClienteId, { status });
         closeModal('modalSuspender');
         if (error) { toast('Erro ao atualizar status.', 'error'); return; }
         toast('Status atualizado!', 'success');
@@ -651,24 +726,25 @@
     async function confirmarNovaChave() {
         const tipo  = document.getElementById('nkTipo').value;
         const expir = document.getElementById('nkExpiracao').value;
-        const chave = await gerarChave();
+        const chave = gerarChave();
         const payload = { cliente_id: currentClienteId, chave, tipo };
         if (expir) payload.data_expiracao = new Date(expir).toISOString();
-        const { error } = await db.from('licencas').insert(payload);
+        const { error } = await dbInsert('licencas', payload);
         closeModal('modalNovaChave');
         if (error) { toast('Erro ao gerar chave.', 'error'); return; }
         mostrarChave(chave);
+        loadLicencas();
     }
 
     async function toggleLicenca(id, ativa) {
-        const { error } = await db.from('licencas').update({ ativa: !ativa }).eq('id', id);
+        const { error } = await dbUpdate('licencas', id, { ativa: !ativa });
         if (error) { toast('Erro ao atualizar licença.', 'error'); return; }
         toast(ativa ? 'Licença desativada.' : 'Licença ativada!', 'success');
         loadLicencas();
     }
 
     // ===== HELPERS =====
-    async function gerarChave() {
+    function gerarChave() {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
         return `GDE-${seg()}-${seg()}-${seg()}`;
@@ -702,7 +778,6 @@
     function openModal(id)  { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-    // Fechar modal clicando fora
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
         overlay.addEventListener('click', function(e) { if (e.target === this) this.classList.add('hidden'); });
     });
