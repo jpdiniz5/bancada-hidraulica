@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin | Hidráulicos Fenili</title>
+    <title>Admin | GD Elétrica & Automação Industrial</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -183,8 +183,8 @@
 <!-- ===== LOGIN ===== -->
 <div id="loginScreen">
     <div class="login-box">
-        <div class="login-logo">🔧 FENILI</div>
-        <div class="login-sub">Painel Administrativo · Maleta Hidráulica</div>
+        <div class="login-logo" style="font-size:1.5rem">⚡ GD Elétrica</div>
+        <div class="login-sub">Painel Administrativo · Gestão de Licenças</div>
         <input type="email"    id="loginEmail" class="login-input" placeholder="Email" autocomplete="email">
         <input type="password" id="loginPass"  class="login-input" placeholder="Senha" autocomplete="current-password">
         <button class="login-btn" onclick="doLogin()" id="loginBtn">Entrar</button>
@@ -195,7 +195,7 @@
 <!-- ===== ADMIN APP ===== -->
 <div id="adminApp">
     <div class="topbar">
-        <div class="topbar-brand">🔧 <span>FENILI</span> Admin</div>
+        <div class="topbar-brand">⚡ <span>GD Elétrica</span> &amp; Automação · Admin</div>
         <div class="topbar-right">
             <span class="admin-badge" id="adminEmail"></span>
             <button class="logout-btn" onclick="doLogout()">Sair</button>
@@ -671,7 +671,7 @@
     async function gerarChave() {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-        return `FENILI-${seg()}-${seg()}-${seg()}`;
+        return `GDE-${seg()}-${seg()}-${seg()}`;
     }
 
     function mostrarChave(chave) {
