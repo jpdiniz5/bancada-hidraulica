@@ -702,7 +702,7 @@
             const r = await fetch(`${SUPABASE_URL}/functions/v1/enviar-licenca`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-                body: JSON.stringify({ email, nome, empresa, chave }),
+                body: JSON.stringify({ modo: 'licenca', email, nome, empresa, chave }),
                 signal: AbortSignal.timeout(15000)
             });
             if (r.ok) toast('Email com a licença enviado ao cliente!', 'success');
