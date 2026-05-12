@@ -674,9 +674,12 @@
     }
 
     async function confirmarAprovacao() {
-        const btn   = document.getElementById('apvBtn');
-        const tipo  = document.getElementById('apvTipo').value;
-        const expir = document.getElementById('apvExpiracao').value;
+        const btn    = document.getElementById('apvBtn');
+        const tipo   = document.getElementById('apvTipo').value;
+        const expir  = document.getElementById('apvExpiracao').value;
+        const nome   = document.getElementById('apvNome').textContent;
+        const email  = document.getElementById('apvEmail').textContent;
+        const empresa = document.getElementById('apvEmpresa').textContent;
         btn.textContent = 'Processando...'; btn.disabled = true;
 
         const { error: errStatus } = await dbUpdate('clientes', currentClienteId, { status: 'ativo' });
@@ -693,6 +696,20 @@
         closeModal('modalAprovar');
         mostrarChave(chave);
         loadAll();
+
+        // Enviar email com a chave ao cliente
+        try {
+            const r = await fetch(`${SUPABASE_URL}/functions/v1/enviar-licenca`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+                body: JSON.stringify({ email, nome, empresa, chave }),
+                signal: AbortSignal.timeout(15000)
+            });
+            if (r.ok) toast('Email com a licença enviado ao cliente!', 'success');
+            else toast('Chave gerada, mas falha ao enviar email.', 'error');
+        } catch (_) {
+            toast('Chave gerada, mas falha ao enviar email.', 'error');
+        }
     }
 
     function abrirStatus(id, nome, statusAtual) {
