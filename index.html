@@ -1316,8 +1316,43 @@
         .print-footer {
             display: none;
         }
+        /* ===== TELA DE CADASTRO ===== */
+        .reg-success {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            margin-top: 15px;
+            display: none;
+        }
+        .license-link-btn {
+            background: none;
+            border: none;
+            color: var(--secondary);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: underline;
+            margin-top: 10px;
+            display: block;
+            width: 100%;
+        }
+        .license-link-btn:hover { color: #00a8cc; }
+        .license-input-group { margin-bottom: 16px; text-align: left; }
+        .license-input-group label { font-size: 0.85rem; font-weight: 600; color: #555; display: block; margin-bottom: 6px; }
+        .license-input-sm {
+            width: 100%;
+            padding: 13px 16px;
+            font-size: 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        .license-input-sm:focus { outline: none; border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(0,212,255,0.15); }
     </style>
 </head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <body>
     <!-- ===== TELA DE ATIVAÇÃO ===== -->
     <div class="license-overlay" id="licenseOverlay">
@@ -1338,11 +1373,52 @@
             </button>
             
             <p class="license-error" id="licenseError">Chave de ativação inválida!</p>
+
+            <button class="license-link-btn" onclick="showRegScreen()">Não tem chave? Solicitar acesso</button>
             
             <div class="license-info">
                 <p>Entre em contato para obter sua licença:</p>
                 <p><strong>📱 (49) 99120-8836</strong></p>
                 <p>📧 jpdiniz5@gmail.com</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TELA DE CADASTRO / SOLICITAÇÃO ===== -->
+    <div class="license-overlay hidden" id="regOverlay">
+        <div class="license-box">
+            <div class="license-logo">🔧 MALETA HIDRÁULICA</div>
+            <p class="license-subtitle">Solicitar Acesso | Hidráulicos Fenili</p>
+
+            <div class="license-input-group">
+                <label for="regNome">Nome completo *</label>
+                <input type="text" class="license-input-sm" id="regNome" placeholder="Seu nome">
+            </div>
+            <div class="license-input-group">
+                <label for="regEmail">Email *</label>
+                <input type="email" class="license-input-sm" id="regEmail" placeholder="seu@email.com">
+            </div>
+            <div class="license-input-group">
+                <label for="regEmpresa">Empresa</label>
+                <input type="text" class="license-input-sm" id="regEmpresa" placeholder="Nome da empresa">
+            </div>
+            <div class="license-input-group">
+                <label for="regTelefone">Telefone</label>
+                <input type="text" class="license-input-sm" id="regTelefone" placeholder="(XX) XXXXX-XXXX">
+            </div>
+
+            <button class="license-btn license-btn-primary" id="regBtn" onclick="solicitarAcesso()">
+                ENVIAR SOLICITAÇÃO
+            </button>
+
+            <p class="license-error" id="regError"></p>
+            <div class="reg-success" id="regSuccess"></div>
+
+            <button class="license-link-btn" onclick="showActivationScreen()">← Voltar para ativação</button>
+
+            <div class="license-info">
+                <p>Após aprovação você receberá a chave por email.</p>
+                <p><strong>📱 (49) 99120-8836</strong></p>
             </div>
         </div>
     </div>
@@ -1674,194 +1750,94 @@
 
     <script>
         // ===== SISTEMA DE LICENCIAMENTO =====
-        const LICENSE_CONFIG = {
-            // Chaves de ativação (hash SHA-256 para ofuscar)
-            DEMO_KEY: 'FENILI-DEMO-2026',
-            FULL_KEY: 'FENILI-HF-PRO-2026',
-            // Configurações
-            DEMO_DAYS: 2,
-            STORAGE_KEY: 'hf_bancada_license',
-            VERSION: '1.0.0'
-        };
+        // ===== SISTEMA DE LICENCIAMENTO - SUPABASE =====
+        // IMPORTANTE: Substitua as variaveis abaixo com seus dados do Supabase
+        // Painel: https://app.supabase.com -> Settings -> API
+        const SUPABASE_URL      = 'https://hbhjvmfanctuhpunhxhf.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiaGp2bWZhbmN0dWhwdW5oeGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1Mzc1NTIsImV4cCI6MjA5NDExMzU1Mn0.U5ADBbVKP710IPjAgffLS2FRf2BE_gh2k9W8z53kwfk';
 
-        // Função para criar hash simples (ofuscação básica)
-        function simpleHash(str) {
+        const { createClient } = supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const SESSION_KEY = 'hf_session_token';
+
+        function getFingerprint() {
+            const str = [navigator.userAgent, navigator.language, screen.width, screen.height, new Date().getTimezoneOffset()].join('|');
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
-                const char = str.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash;
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
             }
             return Math.abs(hash).toString(36);
         }
 
-        // Função para codificar dados
-        function encodeData(data) {
-            return btoa(JSON.stringify(data));
-        }
+        async function checkLicense() {
+            const token = localStorage.getItem(SESSION_KEY);
+            if (!token) { showActivationScreen(); return; }
 
-        // Função para decodificar dados
-        function decodeData(encoded) {
             try {
-                return JSON.parse(atob(encoded));
-            } catch (e) {
-                return null;
-            }
-        }
-
-        // Verificar licença ao carregar
-        function checkLicense() {
-            const stored = localStorage.getItem(LICENSE_CONFIG.STORAGE_KEY);
-            
-            if (!stored) {
-                // Primeira execução - mostrar tela de ativação
-                showActivationScreen();
-                return false;
-            }
-
-            const licenseData = decodeData(stored);
-            
-            if (!licenseData) {
-                // Dados corrompidos
-                localStorage.removeItem(LICENSE_CONFIG.STORAGE_KEY);
-                showActivationScreen();
-                return false;
-            }
-
-            // Verificar tipo de licença
-            if (licenseData.type === 'full') {
-                // Licença completa - acesso liberado
-                hideLicenseScreens();
-                showLicenseBanner('full');
-                initApp(); // Inicializar app
-                return true;
-            }
-
-            if (licenseData.type === 'demo') {
-                // Verificar se ainda está no período de demo
-                const activationDate = new Date(licenseData.activatedAt);
-                const now = new Date();
-                const diffTime = now - activationDate;
-                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                const daysLeft = LICENSE_CONFIG.DEMO_DAYS - diffDays;
-
-                if (daysLeft <= 0) {
-                    // Demo expirada
-                    showExpiredScreen();
-                    return false;
+                const { data, error } = await db.rpc('verificar_sessao', { p_token: token });
+                if (error || !data?.ok) {
+                    localStorage.removeItem(SESSION_KEY);
+                    showActivationScreen();
+                    return;
                 }
-
-                // Demo ainda válida
                 hideLicenseScreens();
-                showLicenseBanner('demo', daysLeft);
-                initApp(); // Inicializar app
-                return true;
-            }
-
-            // Licença inválida
-            showActivationScreen();
-            return false;
-        }
-
-        // Mostrar tela de ativação
-        function showActivationScreen() {
-            document.getElementById('licenseOverlay').classList.remove('hidden');
-            document.getElementById('licenseExpiredOverlay').classList.add('hidden');
-            document.getElementById('licenseStatusArea').style.display = 'none';
-        }
-
-        // Mostrar tela de expiração
-        function showExpiredScreen() {
-            document.getElementById('licenseOverlay').classList.add('hidden');
-            document.getElementById('licenseExpiredOverlay').classList.remove('hidden');
-        }
-
-        // Esconder telas de licença
-        function hideLicenseScreens() {
-            document.getElementById('licenseOverlay').classList.add('hidden');
-            document.getElementById('licenseExpiredOverlay').classList.add('hidden');
-        }
-
-        // Mostrar banner de licença
-        function showLicenseBanner(type, daysLeft = 0) {
-            const banner = document.getElementById('licenseBanner');
-            const bannerText = document.getElementById('licenseBannerText');
-            
-            if (type === 'full') {
-                // Versão FULL não mostra banner
-                banner.classList.remove('show');
-                banner.style.display = 'none';
-            } else if (type === 'demo') {
-                banner.classList.add('show');
-                banner.classList.remove('full');
-                banner.style.display = 'block';
-                bannerText.textContent = `🕐 Versão DEMO - ${daysLeft} dia${daysLeft > 1 ? 's' : ''} restante${daysLeft > 1 ? 's' : ''}`;
+                showLicenseBanner(data.tipo, data.dias_restantes);
+                initApp();
+            } catch (e) {
+                localStorage.removeItem(SESSION_KEY);
+                showActivationScreen();
             }
         }
 
-        // Validar licença (tela inicial)
-        function validateLicense() {
+        async function validateLicense() {
             const keyInput = document.getElementById('licenseKey');
-            const errorEl = document.getElementById('licenseError');
+            const errorEl  = document.getElementById('licenseError');
             const key = keyInput.value.trim().toUpperCase();
-
             errorEl.classList.remove('show');
 
             if (!key) {
-                errorEl.textContent = 'Digite uma chave de ativação!';
+                errorEl.textContent = 'Digite a chave de ativacao!';
                 errorEl.classList.add('show');
                 return;
             }
 
-            // Verificar chave FULL
-            if (key === LICENSE_CONFIG.FULL_KEY.toUpperCase()) {
-                const licenseData = {
-                    type: 'full',
-                    activatedAt: new Date().toISOString(),
-                    hash: simpleHash(LICENSE_CONFIG.FULL_KEY + LICENSE_CONFIG.VERSION)
-                };
-                localStorage.setItem(LICENSE_CONFIG.STORAGE_KEY, encodeData(licenseData));
-                hideLicenseScreens();
-                showLicenseBanner('full');
-                initApp(); // Inicializar app
-                return;
-            }
+            const btn = document.querySelector('#licenseOverlay .license-btn-primary');
+            const originalText = btn.textContent;
+            btn.textContent = 'Verificando...';
+            btn.disabled = true;
 
-            // Verificar chave DEMO
-            if (key === LICENSE_CONFIG.DEMO_KEY.toUpperCase()) {
-                const licenseData = {
-                    type: 'demo',
-                    activatedAt: new Date().toISOString(),
-                    hash: simpleHash(LICENSE_CONFIG.DEMO_KEY + LICENSE_CONFIG.VERSION)
-                };
-                localStorage.setItem(LICENSE_CONFIG.STORAGE_KEY, encodeData(licenseData));
-                
-                // Mostrar status antes de liberar
-                document.getElementById('licenseStatusArea').style.display = 'block';
-                document.getElementById('licenseStatusBadge').className = 'license-status demo';
-                document.getElementById('licenseStatusBadge').textContent = 'VERSÃO DEMO ATIVADA';
-                document.getElementById('licenseDaysLeft').textContent = LICENSE_CONFIG.DEMO_DAYS + ' dias de avaliação';
-                
-                setTimeout(() => {
+            try {
+                const { data, error } = await db.rpc('validar_chave', {
+                    p_chave:       key,
+                    p_fingerprint: getFingerprint(),
+                    p_user_agent:  navigator.userAgent
+                });
+
+                if (error || !data?.ok) {
+                    errorEl.textContent = data?.mensagem || 'Chave invalida. Tente novamente.';
+                    errorEl.classList.add('show');
+                    keyInput.value = '';
+                } else {
+                    localStorage.setItem(SESSION_KEY, data.token_sessao);
                     hideLicenseScreens();
-                    showLicenseBanner('demo', LICENSE_CONFIG.DEMO_DAYS);
-                    initApp(); // Inicializar app
-                }, 2000);
-                return;
+                    showLicenseBanner(data.tipo, data.dias_restantes);
+                    initApp();
+                }
+            } catch (e) {
+                errorEl.textContent = 'Erro de conexao. Verifique sua internet.';
+                errorEl.classList.add('show');
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
             }
-
-            // Chave inválida
-            errorEl.textContent = 'Chave de ativação inválida!';
-            errorEl.classList.add('show');
-            keyInput.value = '';
         }
 
-        // Validar licença (tela expirada)
-        function validateExpiredLicense() {
+        async function validateExpiredLicense() {
             const keyInput = document.getElementById('licenseKeyExpired');
-            const errorEl = document.getElementById('licenseErrorExpired');
+            const errorEl  = document.getElementById('licenseErrorExpired');
             const key = keyInput.value.trim().toUpperCase();
-
             errorEl.classList.remove('show');
 
             if (!key) {
@@ -1870,27 +1846,125 @@
                 return;
             }
 
-            // Apenas chave FULL aceita na expiração
-            if (key === LICENSE_CONFIG.FULL_KEY.toUpperCase()) {
-                const licenseData = {
-                    type: 'full',
-                    activatedAt: new Date().toISOString(),
-                    hash: simpleHash(LICENSE_CONFIG.FULL_KEY + LICENSE_CONFIG.VERSION)
-                };
-                localStorage.setItem(LICENSE_CONFIG.STORAGE_KEY, encodeData(licenseData));
-                hideLicenseScreens();
-                showLicenseBanner('full');
-                initApp(); // Inicializar app
+            const btn = document.querySelector('#licenseExpiredOverlay .license-btn-primary');
+            const originalText = btn.textContent;
+            btn.textContent = 'Verificando...';
+            btn.disabled = true;
+
+            try {
+                const { data, error } = await db.rpc('validar_chave', {
+                    p_chave:       key,
+                    p_fingerprint: getFingerprint(),
+                    p_user_agent:  navigator.userAgent
+                });
+
+                if (error || !data?.ok) {
+                    errorEl.textContent = data?.mensagem || 'Chave invalida.';
+                    errorEl.classList.add('show');
+                    keyInput.value = '';
+                } else {
+                    localStorage.setItem(SESSION_KEY, data.token_sessao);
+                    hideLicenseScreens();
+                    showLicenseBanner(data.tipo, data.dias_restantes);
+                    initApp();
+                }
+            } catch (e) {
+                errorEl.textContent = 'Erro de conexao. Verifique sua internet.';
+                errorEl.classList.add('show');
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function solicitarAcesso() {
+            const nome      = document.getElementById('regNome').value.trim();
+            const email     = document.getElementById('regEmail').value.trim();
+            const empresa   = document.getElementById('regEmpresa').value.trim();
+            const telefone  = document.getElementById('regTelefone').value.trim();
+            const errorEl   = document.getElementById('regError');
+            const successEl = document.getElementById('regSuccess');
+
+            errorEl.classList.remove('show');
+            successEl.style.display = 'none';
+
+            if (!nome || !email) {
+                errorEl.textContent = 'Nome e email sao obrigatorios.';
+                errorEl.classList.add('show');
                 return;
             }
 
-            // Chave inválida
-            errorEl.textContent = 'Apenas a chave FULL é aceita. Chave DEMO não disponível.';
-            errorEl.classList.add('show');
-            keyInput.value = '';
+            const btn = document.getElementById('regBtn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Enviando...';
+            btn.disabled = true;
+
+            try {
+                const { data, error } = await db.rpc('solicitar_acesso', {
+                    p_nome:     nome,
+                    p_email:    email,
+                    p_empresa:  empresa  || null,
+                    p_telefone: telefone || null
+                });
+
+                if (error || !data?.ok) {
+                    errorEl.textContent = data?.mensagem || 'Erro ao enviar. Tente novamente.';
+                    errorEl.classList.add('show');
+                } else {
+                    successEl.textContent = data.mensagem;
+                    successEl.style.display = 'block';
+                    ['regNome','regEmail','regEmpresa','regTelefone'].forEach(function(id) {
+                        document.getElementById(id).value = '';
+                    });
+                }
+            } catch (e) {
+                errorEl.textContent = 'Erro de conexao. Verifique sua internet.';
+                errorEl.classList.add('show');
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
         }
 
-        // Permitir Enter para ativar
+        function showActivationScreen() {
+            document.getElementById('licenseOverlay').classList.remove('hidden');
+            document.getElementById('licenseExpiredOverlay').classList.add('hidden');
+            document.getElementById('regOverlay').classList.add('hidden');
+        }
+
+        function showExpiredScreen() {
+            document.getElementById('licenseOverlay').classList.add('hidden');
+            document.getElementById('licenseExpiredOverlay').classList.remove('hidden');
+            document.getElementById('regOverlay').classList.add('hidden');
+        }
+
+        function showRegScreen() {
+            document.getElementById('licenseOverlay').classList.add('hidden');
+            document.getElementById('licenseExpiredOverlay').classList.add('hidden');
+            document.getElementById('regOverlay').classList.remove('hidden');
+        }
+
+        function hideLicenseScreens() {
+            document.getElementById('licenseOverlay').classList.add('hidden');
+            document.getElementById('licenseExpiredOverlay').classList.add('hidden');
+            document.getElementById('regOverlay').classList.add('hidden');
+        }
+
+        function showLicenseBanner(type, daysLeft) {
+            const banner     = document.getElementById('licenseBanner');
+            const bannerText = document.getElementById('licenseBannerText');
+            if (type === 'full' || type === 'enterprise') {
+                banner.className = 'license-banner show full';
+                bannerText.textContent = 'Licenca Full Ativa - Hidraulicos Fenili';
+            } else {
+                banner.className = 'license-banner show';
+                bannerText.textContent = daysLeft != null
+                    ? 'Versao DEMO - ' + daysLeft + ' dias restantes'
+                    : 'Versao DEMO Ativa';
+            }
+        }
+
+        // Permitir Enter nas telas de ativacao
         document.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 if (!document.getElementById('licenseOverlay').classList.contains('hidden')) {

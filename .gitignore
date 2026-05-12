@@ -1,0 +1,5 @@
+# Token de acesso ao MCP do Supabase (NÃO commitar - contém chave secreta)
+.mcp.json
+
+# Configurações internas do Claude Code
+.claude/

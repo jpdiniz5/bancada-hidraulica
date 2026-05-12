@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin | Hidráulicos Fenili</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary: #0A2540;
+            --secondary: #00D4FF;
+            --accent: #FF6B35;
+            --success: #00C853;
+            --warning: #FFB300;
+            --danger: #D32F2F;
+            --bg: #F1F5F9;
+            --card: #ffffff;
+            --text: #334155;
+            --muted: #64748B;
+            --border: #E2E8F0;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        /* ===== LOGIN ===== */
+        #loginScreen {
+            position: fixed; inset: 0;
+            background: linear-gradient(135deg, #0A2540, #1e3a5f);
+            display: flex; align-items: center; justify-content: center; z-index: 999;
+        }
+        #loginScreen.hidden { display: none; }
+        .login-box {
+            background: white; border-radius: 20px; padding: 48px 40px;
+            width: 380px; box-shadow: 0 25px 60px rgba(0,0,0,0.4); text-align: center;
+        }
+        .login-logo { font-size: 2rem; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
+        .login-sub  { color: var(--muted); font-size: .9rem; margin-bottom: 32px; }
+        .login-input {
+            width: 100%; padding: 13px 16px; border: 2px solid var(--border);
+            border-radius: 10px; font-size: 1rem; margin-bottom: 14px; transition: .2s;
+        }
+        .login-input:focus { outline: none; border-color: var(--secondary); }
+        .login-btn {
+            width: 100%; padding: 14px; font-size: 1rem; font-weight: 700;
+            background: var(--primary); color: white; border: none; border-radius: 10px;
+            cursor: pointer; transition: .2s;
+        }
+        .login-btn:hover { background: #0d3060; }
+        .login-error { color: var(--danger); font-size: .85rem; margin-top: 12px; display: none; }
+
+        /* ===== LAYOUT ===== */
+        #adminApp { display: none; }
+        #adminApp.show { display: block; }
+
+        .topbar {
+            background: var(--primary); color: white;
+            padding: 0 28px; height: 58px;
+            display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+        }
+        .topbar-brand { font-size: 1.1rem; font-weight: 700; }
+        .topbar-brand span { color: var(--secondary); }
+        .topbar-right { display: flex; align-items: center; gap: 16px; }
+        .admin-badge { background: rgba(255,255,255,.15); padding: 4px 12px; border-radius: 20px; font-size: .8rem; }
+        .logout-btn { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: white; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: .85rem; transition: .2s; }
+        .logout-btn:hover { background: rgba(255,255,255,.2); }
+
+        .tabs { background: white; border-bottom: 1px solid var(--border); padding: 0 28px; display: flex; gap: 4px; }
+        .tab { padding: 14px 20px; cursor: pointer; font-size: .9rem; font-weight: 600; color: var(--muted); border-bottom: 3px solid transparent; transition: .2s; white-space: nowrap; }
+        .tab:hover { color: var(--primary); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--secondary); }
+
+        .main { padding: 28px; max-width: 1200px; margin: 0 auto; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ===== STATS ===== */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
+        .stat-card {
+            background: var(--card); border-radius: 14px; padding: 20px;
+            border-left: 4px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,.05);
+        }
+        .stat-card.pendente { border-left-color: var(--warning); }
+        .stat-card.ativo    { border-left-color: var(--success); }
+        .stat-card.acesso   { border-left-color: var(--secondary); }
+        .stat-card.total    { border-left-color: var(--primary); }
+        .stat-value { font-size: 2.2rem; font-weight: 800; color: var(--primary); }
+        .stat-label { font-size: .8rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+
+        /* ===== CARDS ===== */
+        .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .section-title { font-size: 1.1rem; font-weight: 700; color: var(--primary); }
+        .refresh-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: .8rem; transition: .2s; }
+        .refresh-btn:hover { border-color: var(--secondary); color: var(--primary); }
+
+        /* ===== TABLE ===== */
+        .table-wrap { background: var(--card); border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+        table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+        th { background: var(--bg); padding: 12px 16px; text-align: left; font-weight: 700; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
+        td { padding: 13px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #F8FAFC; }
+
+        /* ===== BADGES ===== */
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .75rem; font-weight: 700; }
+        .badge-pendente  { background: #FFF3CD; color: #856404; }
+        .badge-ativo     { background: #D4EDDA; color: #155724; }
+        .badge-suspenso  { background: #F8D7DA; color: #721C24; }
+        .badge-cancelado { background: #E2E8F0; color: #475569; }
+        .badge-full      { background: #DBEAFE; color: #1E40AF; }
+        .badge-demo      { background: #FFF3CD; color: #92400E; }
+        .badge-validado  { background: #D4EDDA; color: #155724; }
+        .badge-negado    { background: #F8D7DA; color: #721C24; }
+        .badge-expirado  { background: #FEE2E2; color: #991B1B; }
+        .badge-suspenso-ev { background: #FEF3C7; color: #92400E; }
+
+        /* ===== BUTTONS ===== */
+        .btn { padding: 7px 14px; border: none; border-radius: 8px; cursor: pointer; font-size: .8rem; font-weight: 600; transition: .2s; white-space: nowrap; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-success  { background: var(--success); color: white; }
+        .btn-success:hover:not(:disabled)  { background: #00A844; }
+        .btn-warning  { background: var(--warning); color: #333; }
+        .btn-warning:hover:not(:disabled)  { background: #E6A000; }
+        .btn-danger   { background: var(--danger); color: white; }
+        .btn-danger:hover:not(:disabled)   { background: #B71C1C; }
+        .btn-primary  { background: var(--primary); color: white; }
+        .btn-primary:hover:not(:disabled)  { background: #0d3060; }
+        .btn-outline  { background: white; border: 1px solid var(--border); color: var(--text); }
+        .btn-outline:hover:not(:disabled)  { border-color: var(--primary); }
+        .btn-gap { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        /* ===== MODAL ===== */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 500; }
+        .modal-overlay.hidden { display: none; }
+        .modal { background: white; border-radius: 16px; padding: 32px; width: 480px; max-width: 95vw; box-shadow: 0 25px 50px rgba(0,0,0,.3); }
+        .modal-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 20px; color: var(--primary); }
+        .modal-field { margin-bottom: 14px; }
+        .modal-label { font-size: .8rem; font-weight: 600; color: var(--muted); margin-bottom: 5px; display: block; text-transform: uppercase; letter-spacing: .5px; }
+        .modal-input { width: 100%; padding: 10px 14px; border: 2px solid var(--border); border-radius: 8px; font-size: .95rem; transition: .2s; }
+        .modal-input:focus { outline: none; border-color: var(--secondary); }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+        .modal-info { background: var(--bg); border-radius: 10px; padding: 14px; font-size: .88rem; }
+        .modal-info strong { display: block; margin-bottom: 4px; color: var(--primary); }
+
+        /* ===== CHAVE DISPLAY ===== */
+        .chave-display { font-family: 'Courier New', monospace; font-size: 1.1rem; font-weight: 700; color: var(--primary); background: #EFF6FF; padding: 12px 16px; border-radius: 10px; letter-spacing: 2px; text-align: center; border: 2px dashed #BFDBFE; cursor: pointer; }
+        .chave-display:hover { background: #DBEAFE; }
+        .copy-hint { font-size: .75rem; color: var(--muted); text-align: center; margin-top: 6px; }
+
+        /* ===== EMPTY STATE ===== */
+        .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+        .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+        .empty-text { font-size: .95rem; }
+
+        /* ===== LOADING ===== */
+        .loading-row td { text-align: center; color: var(--muted); padding: 32px; font-style: italic; }
+
+        /* ===== TOAST ===== */
+        .toast { position: fixed; bottom: 24px; right: 24px; background: var(--primary); color: white; padding: 12px 20px; border-radius: 10px; font-size: .9rem; font-weight: 600; z-index: 999; transform: translateY(100px); opacity: 0; transition: .3s; box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { background: var(--success); }
+        .toast.error   { background: var(--danger); }
+
+        /* ===== FILTRO ===== */
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+        .filter-select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: .85rem; background: white; color: var(--text); }
+        .search-input { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: .85rem; flex: 1; min-width: 200px; }
+        .search-input:focus { outline: none; border-color: var(--secondary); }
+
+        @media (max-width: 600px) {
+            .main { padding: 16px; }
+            .tabs { padding: 0 16px; overflow-x: auto; }
+            .topbar { padding: 0 16px; }
+            .tab { padding: 12px 14px; font-size: .82rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="loginScreen">
+    <div class="login-box">
+        <div class="login-logo">🔧 FENILI</div>
+        <div class="login-sub">Painel Administrativo · Maleta Hidráulica</div>
+        <input type="email"    id="loginEmail" class="login-input" placeholder="Email" autocomplete="email">
+        <input type="password" id="loginPass"  class="login-input" placeholder="Senha" autocomplete="current-password">
+        <button class="login-btn" onclick="doLogin()" id="loginBtn">Entrar</button>
+        <div class="login-error" id="loginError"></div>
+    </div>
+</div>
+
+<!-- ===== ADMIN APP ===== -->
+<div id="adminApp">
+    <div class="topbar">
+        <div class="topbar-brand">🔧 <span>FENILI</span> Admin</div>
+        <div class="topbar-right">
+            <span class="admin-badge" id="adminEmail"></span>
+            <button class="logout-btn" onclick="doLogout()">Sair</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('pendentes', this)">⏳ Pendentes <span id="badgePendentes"></span></div>
+        <div class="tab" onclick="switchTab('clientes', this)">👥 Clientes</div>
+        <div class="tab" onclick="switchTab('licencas', this)">🔑 Licenças</div>
+        <div class="tab" onclick="switchTab('logs', this)">📋 Logs de Acesso</div>
+    </div>
+
+    <div class="main">
+
+        <!-- ===== STATS ===== -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card pendente"><div class="stat-value" id="statPendentes">-</div><div class="stat-label">Pendentes</div></div>
+            <div class="stat-card ativo">   <div class="stat-value" id="statAtivos">-</div>   <div class="stat-label">Ativos</div></div>
+            <div class="stat-card total">   <div class="stat-value" id="statTotal">-</div>    <div class="stat-label">Total Clientes</div></div>
+            <div class="stat-card acesso">  <div class="stat-value" id="statAcessos">-</div>  <div class="stat-label">Acessos Hoje</div></div>
+        </div>
+
+        <!-- ===== TAB: PENDENTES ===== -->
+        <div class="tab-content active" id="tab-pendentes">
+            <div class="section-header">
+                <div class="section-title">Clientes aguardando aprovação</div>
+                <button class="refresh-btn" onclick="loadPendentes()">↻ Atualizar</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Nome</th><th>Email</th><th>Empresa</th><th>Telefone</th><th>Cadastro</th><th>Ações</th></tr></thead>
+                    <tbody id="tbodyPendentes"><tr class="loading-row"><td colspan="6">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ===== TAB: CLIENTES ===== -->
+        <div class="tab-content" id="tab-clientes">
+            <div class="section-header">
+                <div class="section-title">Todos os Clientes</div>
+                <button class="refresh-btn" onclick="loadClientes()">↻ Atualizar</button>
+            </div>
+            <div class="filter-bar">
+                <select class="filter-select" id="filterStatus" onchange="loadClientes()">
+                    <option value="">Todos os status</option>
+                    <option value="pendente">Pendentes</option>
+                    <option value="ativo">Ativos</option>
+                    <option value="suspenso">Suspensos</option>
+                    <option value="cancelado">Cancelados</option>
+                </select>
+                <input type="text" class="search-input" id="searchClientes" placeholder="Buscar por nome ou email..." oninput="loadClientes()">
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Nome</th><th>Email</th><th>Empresa</th><th>Status</th><th>Cadastro</th><th>Ações</th></tr></thead>
+                    <tbody id="tbodyClientes"><tr class="loading-row"><td colspan="6">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ===== TAB: LICENÇAS ===== -->
+        <div class="tab-content" id="tab-licencas">
+            <div class="section-header">
+                <div class="section-title">Licenças Geradas</div>
+                <button class="refresh-btn" onclick="loadLicencas()">↻ Atualizar</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Chave</th><th>Cliente</th><th>Tipo</th><th>Status</th><th>Expira</th><th>Acessos</th><th>Último Acesso</th><th>Ações</th></tr></thead>
+                    <tbody id="tbodyLicencas"><tr class="loading-row"><td colspan="8">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ===== TAB: LOGS ===== -->
+        <div class="tab-content" id="tab-logs">
+            <div class="section-header">
+                <div class="section-title">Logs de Acesso (últimos 200)</div>
+                <button class="refresh-btn" onclick="loadLogs()">↻ Atualizar</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Data/Hora</th><th>Chave Usada</th><th>Evento</th><th>IP</th><th>User Agent</th></tr></thead>
+                    <tbody id="tbodyLogs"><tr class="loading-row"><td colspan="5">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ===== MODAL APROVAR ===== -->
+<div class="modal-overlay hidden" id="modalAprovar">
+    <div class="modal">
+        <div class="modal-title">✅ Aprovar Cliente e Gerar Chave</div>
+        <div class="modal-info">
+            <strong id="apvNome"></strong>
+            <span id="apvEmail"></span> · <span id="apvEmpresa"></span>
+        </div>
+        <div style="margin-top:20px;">
+            <div class="modal-field">
+                <label class="modal-label">Tipo de Licença</label>
+                <select class="modal-input" id="apvTipo">
+                    <option value="full">Full (sem expiração)</option>
+                    <option value="demo">Demo (com prazo)</option>
+                </select>
+            </div>
+            <div class="modal-field" id="apvExpiracaoField" style="display:none;">
+                <label class="modal-label">Data de Expiração</label>
+                <input type="date" class="modal-input" id="apvExpiracao">
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal('modalAprovar')">Cancelar</button>
+            <button class="btn btn-success" id="apvBtn" onclick="confirmarAprovacao()">Aprovar e Gerar Chave</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MODAL CHAVE GERADA ===== -->
+<div class="modal-overlay hidden" id="modalChave">
+    <div class="modal" style="text-align:center;">
+        <div class="modal-title">🎉 Chave Gerada com Sucesso!</div>
+        <p style="color:var(--muted);font-size:.9rem;margin-bottom:20px;">Envie esta chave ao cliente por email ou WhatsApp.</p>
+        <div class="chave-display" id="chaveDisplay" onclick="copiarChave()"></div>
+        <div class="copy-hint">Clique para copiar</div>
+        <div class="modal-actions" style="justify-content:center;margin-top:20px;">
+            <button class="btn btn-primary" onclick="closeModal('modalChave');loadAll()">Fechar e Atualizar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MODAL SUSPENDER ===== -->
+<div class="modal-overlay hidden" id="modalSuspender">
+    <div class="modal">
+        <div class="modal-title">⚠️ Alterar Status do Cliente</div>
+        <div class="modal-info"><strong id="suspNome"></strong></div>
+        <div style="margin-top:16px;">
+            <div class="modal-field">
+                <label class="modal-label">Novo Status</label>
+                <select class="modal-input" id="suspStatus">
+                    <option value="ativo">Ativo</option>
+                    <option value="suspenso">Suspenso</option>
+                    <option value="cancelado">Cancelado</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal('modalSuspender')">Cancelar</button>
+            <button class="btn btn-warning" onclick="confirmarStatus()">Salvar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MODAL NOVA CHAVE ===== -->
+<div class="modal-overlay hidden" id="modalNovaChave">
+    <div class="modal">
+        <div class="modal-title">🔑 Gerar Nova Chave de Licença</div>
+        <div class="modal-info"><strong id="nkNome"></strong><span id="nkEmail"></span></div>
+        <div style="margin-top:16px;">
+            <div class="modal-field">
+                <label class="modal-label">Tipo</label>
+                <select class="modal-input" id="nkTipo">
+                    <option value="full">Full</option>
+                    <option value="demo">Demo</option>
+                </select>
+            </div>
+            <div class="modal-field" id="nkExpiracaoField" style="display:none;">
+                <label class="modal-label">Data de Expiração</label>
+                <input type="date" class="modal-input" id="nkExpiracao">
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal('modalNovaChave')">Cancelar</button>
+            <button class="btn btn-primary" onclick="confirmarNovaChave()">Gerar</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+    const SUPABASE_URL = 'https://hbhjvmfanctuhpunhxhf.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiaGp2bWZhbmN0dWhwdW5oeGhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1Mzc1NTIsImV4cCI6MjA5NDExMzU1Mn0.U5ADBbVKP710IPjAgffLS2FRf2BE_gh2k9W8z53kwfk';
+    const { createClient } = supabase;
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let currentClienteId = null;
+
+    // ===== AUTH =====
+    async function doLogin() {
+        const email = document.getElementById('loginEmail').value.trim();
+        const pass  = document.getElementById('loginPass').value;
+        const err   = document.getElementById('loginError');
+        const btn   = document.getElementById('loginBtn');
+        err.style.display = 'none';
+        btn.textContent = 'Entrando...'; btn.disabled = true;
+
+        const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+        btn.textContent = 'Entrar'; btn.disabled = false;
+
+        if (error) {
+            err.textContent = 'Email ou senha incorretos.';
+            err.style.display = 'block';
+            return;
+        }
+
+        // Verificar se é admin
+        const { data: adminRow } = await db.from('admins').select('email').eq('email', data.user.email).maybeSingle();
+        if (!adminRow) {
+            await db.auth.signOut();
+            err.textContent = 'Acesso não autorizado para este email.';
+            err.style.display = 'block';
+            return;
+        }
+
+        showAdmin(data.user.email);
+    }
+
+    document.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !document.getElementById('loginScreen').classList.contains('hidden')) doLogin();
+    });
+
+    async function doLogout() {
+        await db.auth.signOut();
+        document.getElementById('adminApp').classList.remove('show');
+        document.getElementById('loginScreen').classList.remove('hidden');
+        document.getElementById('loginPass').value = '';
+    }
+
+    function showAdmin(email) {
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('adminApp').classList.add('show');
+        document.getElementById('adminEmail').textContent = email;
+        loadAll();
+    }
+
+    // Auto-login se já tem sessão
+    db.auth.onAuthStateChange(async (event, session) => {
+        if (session) {
+            const { data: adminRow } = await db.from('admins').select('email').eq('email', session.user.email).maybeSingle();
+            if (adminRow) showAdmin(session.user.email);
+        }
+    });
+
+    // ===== TABS =====
+    function switchTab(name, el) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('tab-' + name).classList.add('active');
+        const loaders = { pendentes: loadPendentes, clientes: loadClientes, licencas: loadLicencas, logs: loadLogs };
+        if (loaders[name]) loaders[name]();
+    }
+
+    function loadAll() { loadStats(); loadPendentes(); }
+
+    // ===== STATS =====
+    async function loadStats() {
+        const [{ count: total },
+               { count: pendentes },
+               { count: ativos },
+               { count: acessos }] = await Promise.all([
+            db.from('clientes').select('*', { count: 'exact', head: true }),
+            db.from('clientes').select('*', { count: 'exact', head: true }).eq('status', 'pendente'),
+            db.from('clientes').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
+            db.from('log_acesso').select('*', { count: 'exact', head: true })
+              .eq('evento', 'validado').gte('created_at', new Date().toISOString().slice(0,10))
+        ]);
+        document.getElementById('statTotal').textContent    = total    ?? 0;
+        document.getElementById('statPendentes').textContent = pendentes ?? 0;
+        document.getElementById('statAtivos').textContent    = ativos   ?? 0;
+        document.getElementById('statAcessos').textContent   = acessos  ?? 0;
+        const badge = document.getElementById('badgePendentes');
+        badge.textContent = pendentes > 0 ? ` (${pendentes})` : '';
+    }
+
+    // ===== PENDENTES =====
+    async function loadPendentes() {
+        const tbody = document.getElementById('tbodyPendentes');
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="6">Carregando...</td></tr>';
+        const { data } = await db.from('clientes').select('*').eq('status', 'pendente').order('created_at', { ascending: false });
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted)">✅ Nenhum cliente pendente</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(c => `
+            <tr>
+                <td><strong>${esc(c.nome)}</strong></td>
+                <td>${esc(c.email)}</td>
+                <td>${esc(c.empresa || '—')}</td>
+                <td>${esc(c.telefone || '—')}</td>
+                <td style="color:var(--muted);font-size:.8rem">${formatDate(c.created_at)}</td>
+                <td>
+                    <div class="btn-gap">
+                        <button class="btn btn-success" onclick="abrirAprovar('${c.id}','${esc(c.nome)}','${esc(c.email)}','${esc(c.empresa||'')}')">✅ Aprovar</button>
+                        <button class="btn btn-danger"  onclick="abrirStatus('${c.id}','${esc(c.nome)}','cancelado')">✗ Recusar</button>
+                    </div>
+                </td>
+            </tr>`).join('');
+        loadStats();
+    }
+
+    // ===== CLIENTES =====
+    async function loadClientes() {
+        const tbody = document.getElementById('tbodyClientes');
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="6">Carregando...</td></tr>';
+        let q = db.from('clientes').select('*').order('created_at', { ascending: false });
+        const status = document.getElementById('filterStatus').value;
+        const search = document.getElementById('searchClientes').value.trim();
+        if (status) q = q.eq('status', status);
+        if (search) q = q.or(`nome.ilike.%${search}%,email.ilike.%${search}%`);
+        const { data } = await q;
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted)">Nenhum cliente encontrado</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(c => `
+            <tr>
+                <td><strong>${esc(c.nome)}</strong></td>
+                <td>${esc(c.email)}</td>
+                <td>${esc(c.empresa || '—')}</td>
+                <td><span class="badge badge-${c.status}">${c.status}</span></td>
+                <td style="color:var(--muted);font-size:.8rem">${formatDate(c.created_at)}</td>
+                <td>
+                    <div class="btn-gap">
+                        ${c.status === 'pendente' ? `<button class="btn btn-success" onclick="abrirAprovar('${c.id}','${esc(c.nome)}','${esc(c.email)}','${esc(c.empresa||'')}')">✅ Aprovar</button>` : ''}
+                        <button class="btn btn-outline" onclick="abrirNovaChave('${c.id}','${esc(c.nome)}','${esc(c.email)}')">🔑 Nova Chave</button>
+                        <button class="btn btn-warning" onclick="abrirStatus('${c.id}','${esc(c.nome)}','${c.status}')">✎ Status</button>
+                    </div>
+                </td>
+            </tr>`).join('');
+    }
+
+    // ===== LICENÇAS =====
+    async function loadLicencas() {
+        const tbody = document.getElementById('tbodyLicencas');
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="8">Carregando...</td></tr>';
+        const { data } = await db.from('licencas')
+            .select('*, clientes(nome, email)')
+            .order('created_at', { ascending: false });
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Nenhuma licença encontrada</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(l => `
+            <tr>
+                <td>
+                    <code style="font-size:.82rem;color:var(--primary);cursor:pointer" onclick="copiarTexto('${l.chave}')" title="Clique para copiar">${l.chave}</code>
+                </td>
+                <td>
+                    <div style="font-weight:600">${esc(l.clientes?.nome || '—')}</div>
+                    <div style="font-size:.75rem;color:var(--muted)">${esc(l.clientes?.email || '')}</div>
+                </td>
+                <td><span class="badge badge-${l.tipo}">${l.tipo}</span></td>
+                <td><span class="badge ${l.ativa ? 'badge-ativo' : 'badge-cancelado'}">${l.ativa ? 'Ativa' : 'Inativa'}</span></td>
+                <td style="font-size:.82rem">${l.data_expiracao ? formatDate(l.data_expiracao) : '<span style="color:var(--success)">Sem expiração</span>'}</td>
+                <td style="text-align:center">${l.total_acessos}</td>
+                <td style="font-size:.8rem;color:var(--muted)">${l.ultimo_acesso ? formatDate(l.ultimo_acesso) : '—'}</td>
+                <td>
+                    <button class="btn btn-${l.ativa ? 'danger' : 'success'}" onclick="toggleLicenca('${l.id}',${l.ativa})">
+                        ${l.ativa ? '🔒 Desativar' : '🔓 Ativar'}
+                    </button>
+                </td>
+            </tr>`).join('');
+    }
+
+    // ===== LOGS =====
+    async function loadLogs() {
+        const tbody = document.getElementById('tbodyLogs');
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="5">Carregando...</td></tr>';
+        const { data } = await db.from('log_acesso').select('*').order('created_at', { ascending: false }).limit(200);
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">Nenhum log encontrado</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(l => {
+            const badgeClass = l.evento === 'validado' ? 'badge-validado' : l.evento === 'expirado' ? 'badge-expirado' : l.evento === 'suspenso' ? 'badge-suspenso-ev' : 'badge-negado';
+            return `<tr>
+                <td style="font-size:.8rem;white-space:nowrap">${formatDateTime(l.created_at)}</td>
+                <td><code style="font-size:.8rem">${esc(l.chave_usada)}</code></td>
+                <td><span class="badge ${badgeClass}">${l.evento}</span></td>
+                <td style="font-size:.8rem;color:var(--muted)">${esc(l.ip || '—')}</td>
+                <td style="font-size:.75rem;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(l.user_agent||'')}">${esc(l.user_agent || '—')}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ===== AÇÕES =====
+    function abrirAprovar(id, nome, email, empresa) {
+        currentClienteId = id;
+        document.getElementById('apvNome').textContent    = nome;
+        document.getElementById('apvEmail').textContent   = email;
+        document.getElementById('apvEmpresa').textContent = empresa || '';
+        document.getElementById('apvTipo').value = 'full';
+        document.getElementById('apvExpiracaoField').style.display = 'none';
+        document.getElementById('apvTipo').onchange = function() {
+            document.getElementById('apvExpiracaoField').style.display = this.value === 'demo' ? 'block' : 'none';
+        };
+        openModal('modalAprovar');
+    }
+
+    async function confirmarAprovacao() {
+        const btn   = document.getElementById('apvBtn');
+        const tipo  = document.getElementById('apvTipo').value;
+        const expir = document.getElementById('apvExpiracao').value;
+        btn.textContent = 'Processando...'; btn.disabled = true;
+
+        const { error: errStatus } = await db.from('clientes').update({ status: 'ativo' }).eq('id', currentClienteId);
+        if (errStatus) { toast('Erro ao aprovar cliente.', 'error'); btn.textContent = 'Aprovar e Gerar Chave'; btn.disabled = false; return; }
+
+        const chave = await gerarChave();
+        const payload = { cliente_id: currentClienteId, chave, tipo };
+        if (expir) payload.data_expiracao = new Date(expir).toISOString();
+
+        const { error: errLic } = await db.from('licencas').insert(payload);
+        btn.textContent = 'Aprovar e Gerar Chave'; btn.disabled = false;
+
+        if (errLic) { toast('Aprovado, mas erro ao gerar chave.', 'error'); return; }
+        closeModal('modalAprovar');
+        mostrarChave(chave);
+    }
+
+    function abrirStatus(id, nome, statusAtual) {
+        currentClienteId = id;
+        document.getElementById('suspNome').textContent = nome;
+        document.getElementById('suspStatus').value = statusAtual === 'pendente' ? 'cancelado' : statusAtual;
+        openModal('modalSuspender');
+    }
+
+    async function confirmarStatus() {
+        const status = document.getElementById('suspStatus').value;
+        const { error } = await db.from('clientes').update({ status }).eq('id', currentClienteId);
+        closeModal('modalSuspender');
+        if (error) { toast('Erro ao atualizar status.', 'error'); return; }
+        toast('Status atualizado!', 'success');
+        loadAll(); loadClientes();
+    }
+
+    function abrirNovaChave(id, nome, email) {
+        currentClienteId = id;
+        document.getElementById('nkNome').textContent  = nome;
+        document.getElementById('nkEmail').textContent = ' · ' + email;
+        document.getElementById('nkTipo').value = 'full';
+        document.getElementById('nkExpiracaoField').style.display = 'none';
+        document.getElementById('nkTipo').onchange = function() {
+            document.getElementById('nkExpiracaoField').style.display = this.value === 'demo' ? 'block' : 'none';
+        };
+        openModal('modalNovaChave');
+    }
+
+    async function confirmarNovaChave() {
+        const tipo  = document.getElementById('nkTipo').value;
+        const expir = document.getElementById('nkExpiracao').value;
+        const chave = await gerarChave();
+        const payload = { cliente_id: currentClienteId, chave, tipo };
+        if (expir) payload.data_expiracao = new Date(expir).toISOString();
+        const { error } = await db.from('licencas').insert(payload);
+        closeModal('modalNovaChave');
+        if (error) { toast('Erro ao gerar chave.', 'error'); return; }
+        mostrarChave(chave);
+    }
+
+    async function toggleLicenca(id, ativa) {
+        const { error } = await db.from('licencas').update({ ativa: !ativa }).eq('id', id);
+        if (error) { toast('Erro ao atualizar licença.', 'error'); return; }
+        toast(ativa ? 'Licença desativada.' : 'Licença ativada!', 'success');
+        loadLicencas();
+    }
+
+    // ===== HELPERS =====
+    async function gerarChave() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        return `FENILI-${seg()}-${seg()}-${seg()}`;
+    }
+
+    function mostrarChave(chave) {
+        document.getElementById('chaveDisplay').textContent = chave;
+        openModal('modalChave');
+    }
+
+    function copiarChave() { copiarTexto(document.getElementById('chaveDisplay').textContent); }
+
+    function copiarTexto(texto) {
+        navigator.clipboard.writeText(texto).then(() => toast('Chave copiada!', 'success'));
+    }
+
+    function esc(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleDateString('pt-BR');
+    }
+    function formatDateTime(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    }
+
+    function openModal(id)  { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    // Fechar modal clicando fora
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', function(e) { if (e.target === this) this.classList.add('hidden'); });
+    });
+
+    function toast(msg, type = '') {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = 'toast show' + (type ? ' ' + type : '');
+        setTimeout(() => el.className = 'toast', 3000);
+    }
+</script>
+</body>
+</html>
